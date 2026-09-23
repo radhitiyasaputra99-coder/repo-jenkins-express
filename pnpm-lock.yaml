@@ -27,6 +27,9 @@ importers:
       '@antfu/eslint-config':
         specifier: ^6.2.0
         version: 6.2.0(@vue/compiler-sfc@3.5.17)(eslint-plugin-format@1.0.2(eslint@9.30.1))(eslint@9.30.1)(typescript@5.8.3)(vitest@4.0.6(@types/debug@4.1.12)(@types/node@24.0.10)(yaml@2.8.1))
+      eslint:
+        specifier: ^9.30.1
+        version: 9.30.1
       eslint-plugin-format:
         specifier: ^1.0.2
         version: 1.0.2(eslint@9.30.1)
