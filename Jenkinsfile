@@ -37,32 +37,39 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
-            // Heads up: the default agent pod has no Docker daemon either, so this
-            // stage will fail as-is. Building images from inside Kubernetes normally
-            // needs kaniko (or Docker-in-Docker) wired into the pod template - a
-            // separate follow-up once Install & Lint & Test is green.
+        stage('Build Image') {
+            // kaniko builds the image from inside a pod - no Docker daemon and no
+            // privileged container needed, which is what makes it work here.
+            // /busybox/cat + tty keeps the container alive; its shell lives at
+            // /busybox/sh, so the container step is pointed at it explicitly.
+            agent {
+                kubernetes {
+                    yaml '''
+                        apiVersion: v1
+                        kind: Pod
+                        spec:
+                          containers:
+                          - name: kaniko
+                            image: gcr.io/kaniko-project/executor:debug
+                            command: ["/busybox/cat"]
+                            tty: true
+                    '''
+                }
+            }
             steps {
-                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                container(name: 'kaniko', shell: '/busybox/sh') {
+                    // To publish instead of just building: drop --no-push, add
+                    // --destination <registry>/<user>/${IMAGE_NAME}:${IMAGE_TAG},
+                    // and mount a registry credential at /kaniko/.docker/config.json.
+                    sh '/kaniko/executor --context "$(pwd)" --dockerfile Dockerfile --no-push'
+                }
             }
         }
-
-        // Next step once you have a registry + credentials configured in Jenkins:
-        // stage('Push Docker Image') {
-        //     steps {
-        //         withCredentials([usernamePassword(credentialsId: 'registry-creds', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
-        //             sh """
-        //                 echo \$REG_PASS | docker login <your-registry> -u \$REG_USER --password-stdin
-        //                 docker push ${IMAGE_NAME}:${IMAGE_TAG}
-        //             """
-        //         }
-        //     }
-        // }
     }
 
     post {
         success {
-            echo "Pipeline sukses - image ${IMAGE_NAME}:${IMAGE_TAG} siap dipakai."
+            echo "Pipeline sukses - lint, test, dan image build (${IMAGE_NAME}:${IMAGE_TAG}) semua lolos. Image tidak di-push."
         }
         failure {
             echo 'Pipeline gagal, cek Console Output di atas buat detail error-nya.'
