@@ -7,32 +7,41 @@ pipeline {
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
         stage('Install & Lint & Test') {
+            // This Jenkins runs on Kubernetes (Kubernetes plugin), so we ask for a
+            // pod with a Node.js container instead of agent { docker { ... } },
+            // which needs a Docker daemon that the default agent pod doesn't have.
             agent {
-                docker {
-                    image 'node:20-alpine'
-                    args '-u root'
+                kubernetes {
+                    yaml '''
+                        apiVersion: v1
+                        kind: Pod
+                        spec:
+                          containers:
+                          - name: node
+                            image: node:20-alpine
+                            command: ["sleep"]
+                            args: ["infinity"]
+                    '''
                 }
             }
             steps {
-                sh '''
-                    corepack enable
-                    pnpm install --frozen-lockfile
-                    pnpm run lint
-                    pnpm test
-                '''
+                container('node') {
+                    sh '''
+                        corepack enable
+                        pnpm install --frozen-lockfile
+                        pnpm run lint
+                        pnpm test
+                    '''
+                }
             }
         }
 
         stage('Build Docker Image') {
-            // Needs Docker (or an equivalent, e.g. kaniko on a k8s agent) available
-            // on the node that runs this stage.
+            // Heads up: the default agent pod has no Docker daemon either, so this
+            // stage will fail as-is. Building images from inside Kubernetes normally
+            // needs kaniko (or Docker-in-Docker) wired into the pod template - a
+            // separate follow-up once Install & Lint & Test is green.
             steps {
                 sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
             }
