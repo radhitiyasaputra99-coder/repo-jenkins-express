@@ -15,7 +15,10 @@ pipeline {
 
         stage('Install & Lint & Test') {
             agent {
-                docker { image 'node:20-alpine' args '-u root' }
+                docker {
+                    image 'node:20-alpine'
+                    args '-u root'
+                }
             }
             steps {
                 sh '''
